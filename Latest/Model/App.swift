@@ -191,7 +191,12 @@ extension App {
 		let attributedName = NSMutableAttributedString(string: name)
 		
 		if let queryString = query, let selectedRange = name.range(of: queryString, options: .caseInsensitive) {
-			attributedName.addAttribute(.foregroundColor, value: NSColor(resource: .fadedSearchText), range: NSMakeRange(0, name.count))
+			#if SWIFT_PACKAGE
+			let fadedSearchText = NSColor(named: "FadedSearchText", bundle: .module) ?? .secondaryLabelColor
+			#else
+			let fadedSearchText = NSColor(resource: .fadedSearchText)
+			#endif
+			attributedName.addAttribute(.foregroundColor, value: fadedSearchText, range: NSMakeRange(0, name.count))
 			attributedName.removeAttribute(.foregroundColor, range: NSRange(selectedRange, in: name))
 		}
 		

@@ -32,6 +32,23 @@ You can build Latest directly on your machine. To do that, you have to download 
 
 Then you can open the `Latest.xcodeproj` and hit *Build and Run*. Make sure that the `Latest` scheme is selected.
 
+### Swift Package Manager
+
+The package mirrors the Xcode app target's macOS 15.6 minimum and pins Sparkle
+at 2.5.1. With Xcode selected as the active developer directory, build and run
+the existing unit tests from the repository root:
+
+```sh
+swift build
+swift test
+```
+
+The package includes the local CommerceKit and StoreFoundation headers and links
+the corresponding private macOS frameworks. These are only available on macOS.
+Use `Latest.xcodeproj` to build and run the GUI app: SwiftPM's executable and
+resource bundle do not replace the app bundle, Info.plist, signing, and main-bundle
+resource lookups used by Latest.
+
 ## Contribution
 
 I am thankful for all contributions to the project. You can contribute typo-fixes, translations, code and of course suggestions, wishes, and bug reports.
