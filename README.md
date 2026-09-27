@@ -26,11 +26,83 @@ After that, run `brew install --cask latest` to install the current version of L
 
 ### Build from Source
 
-**To build Latest, Xcode 11 and Swift 5 is required.**
+#### Prerequisites
 
-You can build Latest directly on your machine. To do that, you have to download the source code by cloning the repository: `git clone --recurse-submodules git@github.com:mangerlahn/Latest.git`.
+- A Mac running macOS 15.6 or later (the project's deployment target).
+- Full Xcode with a macOS SDK that supports this deployment target. The standalone Command Line Tools are not sufficient.
+- Git and an internet connection to download package dependencies.
 
-Then you can open the `Latest.xcodeproj` and hit *Build and Run*. Make sure that the `Latest` scheme is selected.
+Open Xcode once to accept its license and install any required components. If your command-line tools point to a different installation, select Xcode and verify it:
+
+```bash
+sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+xcodebuild -version
+```
+
+#### Clone the repository
+
+```bash
+git clone --recurse-submodules https://github.com/rfoerthe/Latest.git
+cd Latest
+```
+
+Run all remaining commands from this repository root, which contains `Latest.xcodeproj`. The `Sparkle/` directory only contains private headers; it is not a standalone Xcode project. Xcode obtains Sparkle through the project's Swift package dependency.
+
+#### Resolve package dependencies
+
+```bash
+xcodebuild \
+  -resolvePackageDependencies \
+  -project Latest.xcodeproj \
+  -scheme Latest \
+  -derivedDataPath /tmp/Latest-DerivedData
+```
+
+This downloads the dependencies without compiling the app. Xcode also resolves dependencies automatically when building. The checked-in `Package.resolved` records the resolved versions.
+
+#### Build locally
+
+```bash
+xcodebuild \
+  -project Latest.xcodeproj \
+  -scheme Latest \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  -derivedDataPath /tmp/Latest-DerivedData \
+  build \
+  CODE_SIGN_STYLE=Manual \
+  CODE_SIGN_IDENTITY=- \
+  DEVELOPMENT_TEAM= \
+  ENABLE_HARDENED_RUNTIME=NO
+```
+
+These command-line overrides use ad hoc signing and disable the hardened runtime for local development, avoiding the developer team configured in the project. They do not change the project settings and are not intended for distribution builds.
+
+The built app is at `/tmp/Latest-DerivedData/Build/Products/Debug/Latest.app`. Launch it with:
+
+```bash
+open /tmp/Latest-DerivedData/Build/Products/Debug/Latest.app
+```
+
+#### Run tests
+
+```bash
+xcodebuild \
+  -project Latest.xcodeproj \
+  -scheme Latest \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  -derivedDataPath /tmp/Latest-DerivedData \
+  test \
+  CODE_SIGN_STYLE=Manual \
+  CODE_SIGN_IDENTITY=- \
+  DEVELOPMENT_TEAM= \
+  ENABLE_HARDENED_RUNTIME=NO
+```
+
+The `test` action builds the app and test bundle before running the tests. If Xcode reports that the scheme is not configured for testing, open `Latest.xcodeproj`, select **Product > Scheme > Edit Scheme**, and add the **Latest Tests** target under **Test**. The repository does not currently include a shared scheme, so test configuration may need to be set up on a fresh checkout.
+
+You can also build and test in Xcode: open `Latest.xcodeproj`, select the **Latest** scheme and **My Mac** destination, and select your own development team (or **Sign to Run Locally**) in the app and test targets' signing settings. Use **Product > Run** to launch the app or **Product > Test** to run the tests.
 
 ### Swift Package Manager
 
