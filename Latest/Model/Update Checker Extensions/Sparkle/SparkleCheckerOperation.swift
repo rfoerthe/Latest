@@ -71,11 +71,12 @@ class SparkleUpdateCheckerOperation: StatefulOperation, UpdateCheckerOperation, 
 			// Instantiate a new updater that performs the update
 			let updater = SPUUpdater(hostBundle: bundle, applicationBundle: bundle, userDriver: self, delegate: self)
 			
-			do {
-				try updater.start()
-			} catch let error {
-				self.finish(with: error)
-			}
+				do {
+					try updater.start()
+				} catch let error {
+					self.finishAfterLogging(error)
+					return
+				}
 			
 			updater.checkForUpdates()
 			
@@ -109,6 +110,18 @@ class SparkleUpdateCheckerOperation: StatefulOperation, UpdateCheckerOperation, 
 			self.finish()
 		})
 	}
+
+	private func finishAfterLogging(_ error: Error) {
+		guard !self.isFinished else { return }
+
+		NSLog(
+			"Sparkle update check failed for \"%@\" (feed: %@): %@",
+			self.app.name,
+			self.url?.absoluteString ?? "<unavailable>",
+			error.localizedDescription
+		)
+		self.finish(with: error)
+	}
 }
 
 // MARK: - Driver Implementation
@@ -128,14 +141,16 @@ extension SparkleUpdateCheckerOperation: SPUUserDriver {
 		let nsError = error as NSError
 		if nsError.domain == SUSparkleErrorDomain && nsError.code == SUError.noUpdateError.rawValue, let appcastItem = nsError.userInfo[SPULatestAppcastItemFoundKey] as? SUAppcastItem {
 			self.finish(with: appcastItem)
+			acknowledgement()
+			return
 		}
 		
-		self.finish(with: error)
+		self.finishAfterLogging(error)
 		acknowledgement()
 	}
 	
 	func showUpdaterError(_ error: Error, acknowledgement: @escaping () -> Void) {
-		self.finish(with: error)
+		self.finishAfterLogging(error)
 		acknowledgement()
 	}
 	

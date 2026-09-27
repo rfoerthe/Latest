@@ -7,6 +7,9 @@
 
 import Foundation
 import QuartzCore
+#if os(macOS)
+import AppKit
+#endif
 
 /// Cross-platform convenience for accessing a DisplayLink.
 class DisplayLink: NSObject {
@@ -20,11 +23,7 @@ class DisplayLink: NSObject {
 	/// The current  animation progress. Only useful if a duration has been set.
 	private(set) var progress : Double = 0
     
-    #if os(macOS)
-    private var displayLink : CVDisplayLink!
-    #else
     private var displayLink : CADisplayLink!
-    #endif
     
 	/// Frames used to calculate the animation progress
     private var _currentFrame : Double = 0
@@ -36,36 +35,33 @@ class DisplayLink: NSObject {
 	
 	// MARK: - Initialization
 	
-	/// Initializes the display link with the given duration and callback.
-	init(duration: Double?, callback: @escaping ((_ progress: Double) -> Void)) {
-        super.init()
-        
-        self.duration = duration
-        self.callback = callback
-        
+		/// Initializes the display link with the given duration and callback.
 		#if os(macOS)
-		func displayLinkOutputCallback(_ displayLink: CVDisplayLink, _ inNow: UnsafePointer<CVTimeStamp>, _ inOutputTime: UnsafePointer<CVTimeStamp>, _ flagsIn: CVOptionFlags, _ flagsOut: UnsafeMutablePointer<CVOptionFlags>, _ displayLinkContext: UnsafeMutableRawPointer?) -> CVReturn {
-			guard let displayLinkContext else { return kCVReturnInvalidArgument }
-			
-			unsafeBitCast(displayLinkContext, to: DisplayLink.self).displayTick()
-			return kCVReturnSuccess
+		init(view: NSView, duration: Double?, callback: @escaping ((_ progress: Double) -> Void)) {
+	        super.init()
+	        
+	        self.duration = duration
+	        self.callback = callback
+	        
+			self.displayLink = view.displayLink(
+				target: self,
+				selector: #selector(DisplayLink.displayTick)
+			)
+			self.displayLink.add(to: .current, forMode: .common)
 		}
-		
-		CVDisplayLinkCreateWithActiveCGDisplays(&self.displayLink)
-		CVDisplayLinkSetOutputCallback(self.displayLink, displayLinkOutputCallback, UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()))
 		#else
-		self.displayLink = CADisplayLink(target: self,
-									   selector: #selector(DisplayLink.displayTick))
-		self.displayLink.add(to: .current, forMode: .common)
+		init(duration: Double?, callback: @escaping ((_ progress: Double) -> Void)) {
+			super.init()
+
+			self.duration = duration
+			self.callback = callback
+			self.displayLink = CADisplayLink(
+				target: self,
+				selector: #selector(DisplayLink.displayTick)
+			)
+			self.displayLink.add(to: .current, forMode: .common)
+		}
 		#endif
-	}
-	
-	deinit {
-		#if os(macOS)
-		// Immediately remove callback to avoid access to the deallocated access to this object from the callback on a background thread
-		CVDisplayLinkSetOutputCallback(self.displayLink, nil, nil)
-		#endif
-	}
 
 	
 	// MARK: - Animation
@@ -74,25 +70,15 @@ class DisplayLink: NSObject {
         guard let displayLink = self.displayLink else { return }
         
 		if let duration = self.duration {
-			#if os(macOS)
-				let rate = CVDisplayLinkGetActualOutputVideoRefreshPeriod(displayLink)
-				self._frames = duration / rate
-			#else
-				let rate = (1 / (displayLink.targetTimestamp - displayLink.timestamp)).rounded()
-				self._frames = duration * rate
-			#endif
+					let rate = (1 / (displayLink.targetTimestamp - displayLink.timestamp)).rounded()
+					self._frames = duration * rate
 		}
 		
 		else {
 			self._frames = 1
 		}
         
-#if os(macOS)
-		// Make 60 FPS the default rate and adjust progress increases based on the actual refresh rate of the display.
-		self._currentFrame += CVDisplayLinkGetActualOutputVideoRefreshPeriod(displayLink) / (1 / 60.0)
-#else
-		self._currentFrame += 1
-#endif
+			self._currentFrame += 1
         
 		// Forward progress to the observer
 		DispatchQueue.main.async {
@@ -113,33 +99,17 @@ class DisplayLink: NSObject {
     func start() {
         self._currentFrame = 0
                 
-        #if os(macOS)
-        CVDisplayLinkStart(displayLink)
-        #else
         displayLink.isPaused = false
-        #endif
     }
     
 	/// Stops the display link.
     func stop() {
-        #if os(macOS)
-		// Must not be called on sync Main Thread, as it causes a deadlock there.
-		DispatchQueue.global().async { [weak self] in
-			guard let self = self else { return }
-			CVDisplayLinkStop(self.displayLink)
-		}
-        #else
         displayLink.isPaused = true
-        #endif
     }
     
 	/// Whether the display link is currently running.
     var isRunning : Bool {
-        #if os(macOS)
-        return CVDisplayLinkIsRunning(displayLink)
-        #else
-        return displayLink.isPaused
-        #endif
+        return !displayLink.isPaused
     }
     
 }
