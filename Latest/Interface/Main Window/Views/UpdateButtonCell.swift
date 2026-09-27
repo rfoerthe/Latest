@@ -71,7 +71,7 @@ class UpdateButtonCell: NSButtonCell {
 	}
 	
 	private func startDisplayLink(withDuration duration: Double?) {
-		displayLink = DisplayLink(duration: duration, callback: { [weak self] frame in
+		displayLink = DisplayLink(view: self.view, duration: duration, callback: { [weak self] frame in
 			self?.view.needsDisplay = true
 		})
 		displayLink?.start()

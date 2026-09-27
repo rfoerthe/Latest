@@ -23,7 +23,8 @@ class MacAppStoreUpdateCheckerOperation: StatefulOperation, UpdateCheckerOperati
 		let fileManager = FileManager.default
 		
 		// Mac Apps contain a receipt, iOS apps are only available via the Mac App Store
-		guard let receiptPath = receiptPath(forAppAt: url), fileManager.fileExists(atPath: receiptPath) || isIOSAppBundle(at: url) else { return false }
+		let receiptPath = receiptPath(forAppAt: url)
+		guard fileManager.fileExists(atPath: receiptPath) || isIOSAppBundle(at: url) else { return false }
 		
 		return true
 	}
@@ -77,17 +78,16 @@ class MacAppStoreUpdateCheckerOperation: StatefulOperation, UpdateCheckerOperati
 	
 	// MARK: - Bundle Operations
 	
-	/// Returns the app store receipt path for the app at the given URL, if available.
-	static fileprivate func receiptPath(forAppAt url: URL) -> String? {
-		let bundle = Bundle(path: url.path)
-		return bundle?.appStoreReceiptURL?.path
+	/// Returns the app store receipt path for the app at the given URL.
+	static fileprivate func receiptPath(forAppAt url: URL) -> String {
+		return url.appendingPathComponent("Contents/_MASReceipt/receipt").path
 	}
 	
 	/// Returns whether the app at the given URL is an iOS app wrapped to run on macOS.
 	static fileprivate func isIOSAppBundle(at url: URL) -> Bool {
-		// iOS apps are wrapped inside a macOS bundle
-		let path = receiptPath(forAppAt: url)
-		return path?.contains("WrappedBundle") ?? false
+		// iOS apps are stored inside this directory in their macOS wrapper.
+		let wrappedBundleURL = url.appendingPathComponent("Contents/WrappedBundle", isDirectory: true)
+		return FileManager.default.fileExists(atPath: wrappedBundleURL.path)
 	}
 	
 }
@@ -140,7 +140,7 @@ extension MacAppStoreUpdateCheckerOperation {
 		}
 
 		// Add parameters
-		let languageCode = Locale.current.regionCode ?? "US"
+        let languageCode = Locale.current.region?.identifier ?? "US"
 		var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)
 		components?.queryItems = [
 			URLQueryItem(name: "limit", value: "1"),
